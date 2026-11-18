@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Operação Clima e Tempo</title>
+<style>
+  :root{ --cor:#1d9b98; --tinta:#1f2937; --fundo:#f4f8fc; --selecao:#ffe66d; }
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  body{margin:0; background:var(--fundo); color:var(--tinta); font-family:"Trebuchet MS",Verdana,sans-serif}
+  main{max-width:960px; margin:0 auto; padding:16px 14px 40px}
+
+  .faixa{background:var(--cor); color:#fff; border-radius:18px; padding:18px 24px; margin-bottom:18px}
+  .faixa h1{margin:0 0 6px; font-size:clamp(1.3rem,4vw,2rem)}
+  .faixa h2{margin:0 0 6px; font-size:clamp(1.1rem,3.4vw,1.6rem); color:#fff3c4}
+  .faixa p{margin:0}
+
+  .btn{font:inherit; font-weight:bold; color:#fff; background:var(--cor); border:0; border-radius:8px; padding:9px 16px; cursor:pointer}
+  .btn:focus-visible{outline:3px solid var(--tinta); outline-offset:2px}
+
+  .info{display:flex; gap:12px 20px; flex-wrap:wrap; align-items:center; margin-bottom:14px; font-weight:bold}
+  .area{display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start}
+  #grade{
+    display:grid; width:min(96vw,600px); background:#fff; border:3px solid var(--cor);
+    border-radius:12px; padding:6px; touch-action:none; user-select:none; -webkit-user-select:none;
+  }
+  .cel{
+    aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+    font-weight:bold; font-size:clamp(.7rem,2.6vw,1.3rem); cursor:pointer;
+    background:#f1f5f9; border-radius:5px; margin:1px;
+  }
+  .cel.sel{background:var(--selecao)}
+  .lista{flex:1; min-width:220px; background:#fff; border:3px solid var(--cor); border-radius:12px; padding:14px 18px}
+  .lista h3{margin:0 0 10px; font-size:1rem; color:var(--cor)}
+  #palavras{list-style:none; margin:0; padding:0}
+  #palavras li{padding:5px 0 5px 24px; position:relative; font-weight:bold; font-size:1.05rem}
+  #palavras li::before{content:""; position:absolute; left:2px; top:11px; width:12px; height:12px; border-radius:50%; background:var(--cor)}
+  #palavras li.feita{text-decoration:line-through; opacity:.5}
+  #parabens{margin-top:14px; padding:12px; border-radius:8px; background:#b2f2bb; font-weight:bold}
+  .rodape{margin-top:20px; text-align:right; font-size:.85rem; color:var(--cor)}
+</style>
+</head>
+<body>
+<main>
+  <header class="faixa">
+    <h1>OPERAÇÃO CLIMA E TEMPO</h1>
+    <h2>PREVISÃO DO TEMPO</h2>
+    <p>Entenda como são observadas e previstas as condições atmosféricas.</p>
+  </header>
+
+  <div class="info">
+    <span>Tempo: <span id="tempo">0:00</span></span>
+    <span>Achadas: <span id="contagem">0/0</span></span>
+    <button class="btn" id="novo">Novo jogo</button>
+  </div>
+
+  <div class="area">
+    <div id="grade" aria-label="Grade do caça-palavras"></div>
+    <div class="lista">
+      <h3>PALAVRAS PARA ENCONTRAR</h3>
+      <ul id="palavras"></ul>
+      <div id="parabens" hidden>Parabéns! Vocês acharam todas as palavras!</div>
+    </div>
+  </div>
+</main>
+
+<script>
+
+const CONFIG = {
+  tamanho: 15,        
+  diagonais: true,   
+  inversas: true     
+};
+
+const PALAVRAS = ["PREVISÃO", "UMIDADE", "VENTO", "CHUVA", "NUVEM", "PRESSÃO", "TERMÔMETRO"];
+
+
+const $ = s => document.querySelector(s);
+const limpa = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z]/g, "").toUpperCase();
+const ALFABETO = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const MARCAS = ["#8ce99a", "#ff9ecb", "#8ecbff", "#ffc078", "#d0bfff", "#ffd43b", "#99e9f2"];
+const N = CONFIG.tamanho;
+
+let grade, colocadas, achadas, segundos, relogio, sel = null;
+
+function direcoes() {
+  const d = [[0, 1], [1, 0]];
+  if (CONFIG.diagonais) d.push([1, 1], [-1, 1]);
+  if (CONFIG.inversas) d.push(...d.map(([a, b]) => [-a, -b]));
+  return d;
+}
+
+function tentaGerar(lista) {
+  const dirs = direcoes();
+  grade = Array.from({ length: N }, () => Array(N).fill(""));
+  colocadas = [];
+  for (const p of lista) {
+    const L = p.chave.length;
+    for (let t = 0; t < 300; t++) {
+      const [dr, dc] = dirs[Math.floor(Math.random() * dirs.length)];
+      const r = Math.floor(Math.random() * N), c = Math.floor(Math.random() * N);
+      const fr = r + dr * (L - 1), fc = c + dc * (L - 1);
+      if (fr < 0 || fc < 0 || fr >= N || fc >= N) continue;
+      let ok = true;
+      for (let i = 0; i < L; i++) {
+        const x = grade[r + dr * i][c + dc * i];
+        if (x && x !== p.chave[i]) { ok = false; break; }
+      }
+      if (!ok) continue;
+      for (let i = 0; i < L; i++) grade[r + dr * i][c + dc * i] = p.chave[i];
+      colocadas.push(p);
+      break;
+    }
+  }
+  return colocadas.length === lista.length;
+}
+
+function gerar() {
+  const lista = PALAVRAS
+    .map(p => ({ texto: p, chave: limpa(p) }))
+    .sort((a, b) => b.chave.length - a.chave.length);
+  for (let i = 0; i < 50 && !tentaGerar(lista); i++);   
+  for (let r = 0; r < N; r++)
+    for (let c = 0; c < N; c++)
+      if (!grade[r][c]) grade[r][c] = ALFABETO[Math.floor(Math.random() * ALFABETO.length)];
+}
+
+function desenhar() {
+  const g = $("#grade");
+  g.style.gridTemplateColumns = `repeat(${N}, 1fr)`;
+  g.innerHTML = "";
+  for (let r = 0; r < N; r++)
+    for (let c = 0; c < N; c++) {
+      const el = document.createElement("div");
+      el.className = "cel";
+      el.dataset.r = r; el.dataset.c = c;
+      el.textContent = grade[r][c];
+      g.appendChild(el);
+    }
+  $("#palavras").innerHTML = colocadas.map((p, i) => `<li id="p${i}">${p.texto}</li>`).join("");
+  $("#parabens").hidden = true;
+  atualizaContagem();
+}
+
+const atualizaContagem = () => { $("#contagem").textContent = `${achadas.length}/${colocadas.length}`; };
+
+function novoJogo() {
+  gerar();
+  achadas = [];
+  desenhar();
+  clearInterval(relogio);
+  segundos = 0;
+  $("#tempo").textContent = "0:00";
+  relogio = setInterval(() => {
+    segundos++;
+    $("#tempo").textContent = Math.floor(segundos / 60) + ":" + String(segundos % 60).padStart(2, "0");
+  }, 1000);
+}
+
+
+const gradeEl = $("#grade");
+const celulaEm = e => {
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  return el && el.classList.contains("cel") ? el : null;
+};
+const elCel = (r, c) => gradeEl.children[r * N + c];
+const limpaSelecao = () => gradeEl.querySelectorAll(".sel").forEach(e => e.classList.remove("sel"));
+
+
+function linha(r0, c0, r1, c1) {
+  let dr = r1 - r0, dc = c1 - c0;
+  const a = Math.abs(dr), b = Math.abs(dc);
+  if (a > 2 * b) dc = 0;
+  else if (b > 2 * a) dr = 0;
+  else { const m = Math.max(a, b); dr = Math.sign(dr) * m; dc = Math.sign(dc) * m; }
+  const len = Math.max(Math.abs(dr), Math.abs(dc)), sr = Math.sign(dr), sc = Math.sign(dc), out = [];
+  for (let i = 0; i <= len; i++) {
+    const r = r0 + sr * i, c = c0 + sc * i;
+    if (r < 0 || c < 0 || r >= N || c >= N) break;
+    out.push([r, c]);
+  }
+  return out;
+}
+
+gradeEl.addEventListener("pointerdown", e => {
+  const el = celulaEm(e); if (!el) return;
+  gradeEl.setPointerCapture(e.pointerId);
+  sel = { r: +el.dataset.r, c: +el.dataset.c, cels: [[+el.dataset.r, +el.dataset.c]] };
+  limpaSelecao(); el.classList.add("sel");
+});
+
+gradeEl.addEventListener("pointermove", e => {
+  if (!sel) return;
+  const el = celulaEm(e); if (!el) return;
+  sel.cels = linha(sel.r, sel.c, +el.dataset.r, +el.dataset.c);
+  limpaSelecao();
+  sel.cels.forEach(([r, c]) => elCel(r, c).classList.add("sel"));
+});
+
+gradeEl.addEventListener("pointerup", () => {
+  if (!sel) return;
+  const letras = sel.cels.map(([r, c]) => grade[r][c]).join("");
+  const inversa = [...letras].reverse().join("");
+  const idx = colocadas.findIndex((p, i) => !achadas.includes(i) && (p.chave === letras || p.chave === inversa));
+  limpaSelecao();
+  if (idx >= 0) {
+    achadas.push(idx);
+    sel.cels.forEach(([r, c]) => { elCel(r, c).style.background = MARCAS[idx % MARCAS.length]; });
+    $("#p" + idx).classList.add("feita");
+    atualizaContagem();
+    if (achadas.length === colocadas.length) {
+      clearInterval(relogio);
+      $("#parabens").hidden = false;
+    }
+  }
+  sel = null;
+});
+
+gradeEl.addEventListener("pointercancel", () => { limpaSelecao(); sel = null; });
+
+$("#novo").addEventListener("click", novoJogo);
+novoJogo();
+</script>
+</body>
+</html>
